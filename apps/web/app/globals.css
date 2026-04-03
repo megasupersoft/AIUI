@@ -1,0 +1,100 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #cdc8c2;
+  color: #1a1a2e;
+  font-family: 'Geist', 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.3s, color 0.3s;
+}
+
+/* xyflow — these inherit via inline styles from THEME now */
+.react-flow__minimap {
+  border-radius: 8px;
+}
+
+.react-flow__controls {
+  border-radius: 8px !important;
+  overflow: hidden;
+  left: auto !important;
+  right: 10px !important;
+  bottom: 10px !important;
+  background: var(--controls-bg, #d6d6e0) !important;
+  border: 1px solid var(--controls-border, #b8b2aa) !important;
+}
+
+.react-flow__controls button {
+  background: transparent !important;
+  border-bottom: 1px solid var(--controls-border, #b8b2aa) !important;
+  color: var(--controls-text, #504840) !important;
+  fill: var(--controls-text, #504840) !important;
+}
+
+.react-flow__controls button:hover {
+  background: var(--controls-hover, #c5bfb8) !important;
+}
+
+.react-flow__controls button svg {
+  fill: var(--controls-text, #504840) !important;
+}
+
+.react-flow__controls button svg path {
+  fill: var(--controls-text, #504840) !important;
+}
+
+/* Hide the reactflow attribution */
+.react-flow__attribution {
+  display: none !important;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #6b9e78;
+  stroke-width: 2.5;
+}
+
+/* Handles */
+.react-flow__handle {
+  cursor: crosshair !important;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+input, textarea, select {
+  color-scheme: light;
+}
+
+body[data-theme="light"] input,
+body[data-theme="light"] textarea,
+body[data-theme="light"] select {
+  color-scheme: light;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #2a2a3a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: #3a3a52; }

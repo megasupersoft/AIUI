@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - server
+
+  server:
+    build:
+      context: ./server
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./server/workflows:/app/workflows

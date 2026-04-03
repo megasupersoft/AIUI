@@ -1,0 +1,120 @@
+import { NodeDef } from "../../types";
+
+export const txt2imgNode: NodeDef = {
+  id: "txt2img",
+  label: "Text to Image",
+  description: "Generate an image from a text prompt",
+  category: "generate",
+  icon: "Sparkles",
+  inputs: {
+    prompt: { type: "text", label: "Prompt", optional: true },
+    negative: { type: "text", label: "Negative Prompt", optional: true },
+  },
+  outputs: {
+    image: { type: "image", label: "Image" },
+  },
+  params: {
+    prompt: {
+      type: "prompt",
+      label: "Prompt",
+      default: "",
+      placeholder: "A photograph of...",
+      appModeVisible: true,
+    },
+    negative: {
+      type: "prompt",
+      label: "Negative Prompt",
+      default: "",
+      placeholder: "blurry, low quality...",
+    },
+    model: {
+      type: "select",
+      label: "Checkpoint",
+      default: "v1-5-pruned-emaonly.safetensors",
+      options: [
+        { label: "Flux Dev (fp8)", value: "flux1-dev-fp8.safetensors" },
+        { label: "SD 1.5", value: "v1-5-pruned-emaonly.safetensors" },
+        { label: "Realistic Vision v6", value: "realisticVisionV60B1_v51HyperVAE.safetensors" },
+        { label: "CyberRealistic v9", value: "cyberrealistic_v90.safetensors" },
+        { label: "Analog Madness v7", value: "analogMadness_v70.safetensors" },
+        { label: "Epic Photogasm", value: "epicphotogasm_ultimateFidelity.safetensors" },
+        { label: "Photon v1", value: "photon_v1.safetensors" },
+        { label: "Lazy Mix", value: "lazymixRealAmateur_v40.ckpt" },
+      ],
+      appModeVisible: true,
+    },
+    width: {
+      type: "slider",
+      label: "Width",
+      default: 512,
+      min: 512,
+      max: 2048,
+      step: 64,
+      appModeVisible: true,
+    },
+    height: {
+      type: "slider",
+      label: "Height",
+      default: 512,
+      min: 512,
+      max: 2048,
+      step: 64,
+      appModeVisible: true,
+    },
+    steps: {
+      type: "slider",
+      label: "Steps",
+      default: 20,
+      min: 1,
+      max: 50,
+      step: 1,
+    },
+    guidance: {
+      type: "slider",
+      label: "Guidance Scale",
+      default: 7.0,
+      min: 1,
+      max: 20,
+      step: 0.5,
+    },
+    seed: {
+      type: "number",
+      label: "Seed (-1 = random)",
+      default: -1,
+    },
+  },
+  backends: {
+    fal: {
+      modelId: "fal-ai/flux/schnell",
+      paramMap: {
+        prompt: "prompt",
+        negative: "negative_prompt",
+        width: "image_size.width",
+        height: "image_size.height",
+        steps: "num_inference_steps",
+        guidance: "guidance_scale",
+        seed: "seed",
+      },
+      outputMap: {
+        image: "images[0].url",
+      },
+    },
+    comfyui: {
+      expand: (params, _inputs) => ({
+        nodes: {
+          "1": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: "flux1-schnell.safetensors" } },
+          "2": { class_type: "CLIPTextEncode", inputs: { text: params.prompt, clip: ["1", 1] } },
+          "3": { class_type: "CLIPTextEncode", inputs: { text: params.negative || "", clip: ["1", 1] } },
+          "4": { class_type: "EmptyLatentImage", inputs: { width: params.width, height: params.height, batch_size: 1 } },
+          "5": { class_type: "KSampler", inputs: { model: ["1", 0], positive: ["2", 0], negative: ["3", 0], latent_image: ["4", 0], seed: params.seed === -1 ? Math.floor(Math.random() * 2**32) : params.seed, steps: params.steps, cfg: params.guidance, sampler_name: "euler", scheduler: "normal", denoise: 1 } },
+          "6": { class_type: "VAEDecode", inputs: { samples: ["5", 0], vae: ["1", 2] } },
+          "7": { class_type: "SaveImage", inputs: { images: ["6", 0], filename_prefix: "aiui" } },
+        },
+        outputNodeId: "7",
+      }),
+    },
+  },
+  defaultBackend: "comfyui",
+  exposedParams: ["prompt", "model", "width", "height"],
+  width: 340,
+};
