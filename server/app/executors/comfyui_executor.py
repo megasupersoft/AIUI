@@ -24,7 +24,12 @@ class ComfyUIExecutor(BaseExecutor):
         if builder is None:
             raise ValueError(f"No ComfyUI workflow for node type: {node_type}")
 
-        prompt = builder({**params, "_node_type": node_type}, inputs)
+        # Pre-process: upload any image URLs to ComfyUI's input folder
+        device_id = params.get("_device") or None
+        urls = get_worker_urls(device_id)
+        processed_inputs = await self._resolve_image_inputs(inputs, urls["http"])
+
+        prompt = builder({**params, "_node_type": node_type}, processed_inputs)
 
         # Build human-readable labels for progress messages
         node_labels = {}
@@ -35,11 +40,47 @@ class ComfyUIExecutor(BaseExecutor):
         # Fresh client_id per execution to avoid cache collisions
         self.client_id = str(uuid.uuid4())
 
-        # Route to specific worker or auto-balance
-        device_id = params.get("_device") or None
-        urls = get_worker_urls(device_id)
-
         return await self._queue_and_wait(prompt, node_labels, on_progress, urls, device_id or "")
+
+    async def _resolve_image_inputs(self, inputs: dict, http_base: str) -> dict:
+        """Convert image proxy URLs to ComfyUI input filenames by uploading."""
+        resolved = dict(inputs)
+        for key, value in inputs.items():
+            if not isinstance(value, str):
+                continue
+            # Check if it's a proxy URL pointing to a ComfyUI image
+            if "comfyui/view?" in value or "/view?" in value:
+                try:
+                    # Download the image from the proxy/comfyui
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        img_res = await client.get(value)
+                        img_res.raise_for_status()
+                        img_data = img_res.content
+
+                        # Upload to ComfyUI's input folder
+                        import urllib.parse
+                        parsed = urllib.parse.urlparse(value)
+                        qs = urllib.parse.parse_qs(parsed.query)
+                        original_name = qs.get("filename", ["upload.png"])[0]
+
+                        upload_res = await client.post(
+                            f"{http_base}/upload/image",
+                            files={"image": (original_name, img_data, "image/png")},
+                            data={"overwrite": "true"},
+                        )
+                        if upload_res.status_code == 200:
+                            upload_data = upload_res.json()
+                            resolved[key] = upload_data.get("name", original_name)
+                        else:
+                            # Fallback: try just the filename
+                            resolved[key] = original_name
+                except Exception:
+                    # Fallback: extract filename from URL
+                    import urllib.parse
+                    parsed = urllib.parse.urlparse(value)
+                    qs = urllib.parse.parse_qs(parsed.query)
+                    resolved[key] = qs.get("filename", [value])[0]
+        return resolved
 
     async def _queue_and_wait(
         self,

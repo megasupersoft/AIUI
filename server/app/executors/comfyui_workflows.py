@@ -199,53 +199,76 @@ def build_hidream_txt2img(params: dict, inputs: dict) -> dict:
     }
 
 
-# ─── Wan 2.2 Text-to-Video ──────────────────────────────────────────────────
+# ─── Wan (using WanVideoWrapper nodes) ───────────────────────────────────────
+
+def _wan_vae_name(model: str) -> str:
+    if "wan2.2" in model.lower():
+        return "wan2.2_vae.safetensors"
+    return "wan_2.1_vae.safetensors"
+
 
 def build_wan_t2v(params: dict, inputs: dict) -> dict:
-    # NOTE: Wan 2.2 T2V has a 48-channel latent issue with current ComfyUI nodes.
-    # Using Wan22FunControlToVideo which should produce correct latents.
     prompt = inputs.get("prompt") or params.get("prompt", "")
     negative = inputs.get("negative") or params.get("negative", "")
     model = params.get("model", "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors")
+    width = params.get("width", 832)
+    height = params.get("height", 480)
+    num_frames = params.get("frames", 81)
     return {
-        "1": {"class_type": "DiffusionModelLoaderKJ", "inputs": {
-            "model_name": model,
-            "weight_dtype": "default",
-            "compute_dtype": "default",
-            "patch_cublaslinear": False,
-            "sage_attention": "disabled",
-            "enable_fp16_accumulation": False,
+        # Load model via WanVideoWrapper
+        "1": {"class_type": "WanVideoModelLoader", "inputs": {
+            "model": model,
+            "base_precision": "bf16",
+            "quantization": "disabled",
+            "load_device": "main_device",
         }},
-        "2": {"class_type": "CLIPLoader", "inputs": {
-            "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-            "type": "wan",
+        # Load T5 text encoder
+        "2": {"class_type": "LoadWanVideoT5TextEncoder", "inputs": {
+            "model_name": "umt5-xxl-enc-bf16.safetensors",
+            "precision": "bf16",
         }},
-        "3": {"class_type": "VAELoader", "inputs": {"vae_name": "wan2.2_vae.safetensors"}},
-        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["2", 0]}},
-        "5": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["2", 0]}},
-        # WanFunControlToVideo gives 48-channel latents for Wan 2.2
-        "6": {"class_type": "WanFunControlToVideo", "inputs": {
-            "positive": ["4", 0], "negative": ["5", 0], "vae": ["3", 0],
-            "width": params.get("width", 832),
-            "height": params.get("height", 480),
-            "length": params.get("frames", 81),
-            "batch_size": 1,
+        # Load VAE
+        "3": {"class_type": "WanVideoVAELoader", "inputs": {
+            "model_name": _wan_vae_name(model),
+            "precision": "bf16",
         }},
-        "7": {"class_type": "KSampler", "inputs": {
+        # Encode text
+        "4": {"class_type": "WanVideoTextEncode", "inputs": {
+            "positive_prompt": prompt,
+            "negative_prompt": negative,
+            "t5": ["2", 0],
+            "force_offload": True,
+        }},
+        # Empty embeds for T2V (no start image)
+        "5": {"class_type": "WanVideoEmptyEmbeds", "inputs": {
+            "width": width,
+            "height": height,
+            "num_frames": num_frames,
+        }},
+        # Sample
+        "6": {"class_type": "WanVideoSampler", "inputs": {
             "model": ["1", 0],
-            "positive": ["6", 0],  # conditioned positive from WanFunControlToVideo
-            "negative": ["6", 1],  # conditioned negative
-            "latent_image": ["6", 2],  # 48-channel latent
-            "seed": _seed(params.get("seed", -1)),
+            "image_embeds": ["5", 0],
             "steps": params.get("steps", 20),
             "cfg": params.get("guidance", 5.0),
-            "sampler_name": "euler",
-            "scheduler": "simple",
-            "denoise": 1.0,
+            "shift": 8.0,
+            "seed": _seed(params.get("seed", -1)),
+            "force_offload": True,
+            "scheduler": "unipc",
+            "riflex_freq_index": 0,
+            "text_embeds": ["4", 0],
         }},
-        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["7", 0], "vae": ["3", 0]}},
-        "9": {"class_type": "VHS_VideoCombine", "inputs": {
-            "images": ["8", 0],
+        # Decode
+        "7": {"class_type": "WanVideoDecode", "inputs": {
+            "vae": ["3", 0],
+            "samples": ["6", 0],
+            "enable_vae_tiling": True,
+            "tile_x": 480, "tile_y": 320,
+            "tile_stride_x": 240, "tile_stride_y": 160,
+        }},
+        # Combine to video
+        "8": {"class_type": "VHS_VideoCombine", "inputs": {
+            "images": ["7", 0],
             "frame_rate": 16,
             "loop_count": 0,
             "filename_prefix": "aiui_video",
@@ -256,55 +279,93 @@ def build_wan_t2v(params: dict, inputs: dict) -> dict:
     }
 
 
-# ─── Wan 2.2 Image-to-Video ─────────────────────────────────────────────────
-
 def build_wan_i2v(params: dict, inputs: dict) -> dict:
     prompt = inputs.get("prompt") or params.get("prompt", "")
     negative = inputs.get("negative") or params.get("negative", "")
     model = params.get("model", "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors")
+    image = inputs.get("image", "example.png")
+    width = params.get("width", 832)
+    height = params.get("height", 480)
+    num_frames = params.get("frames", 81)
     return {
-        "1": {"class_type": "DiffusionModelLoaderKJ", "inputs": {
-            "model_name": model,
-            "weight_dtype": "default",
-            "compute_dtype": "default",
-            "patch_cublaslinear": False,
-            "sage_attention": "disabled",
-            "enable_fp16_accumulation": False,
+        # Load model
+        "1": {"class_type": "WanVideoModelLoader", "inputs": {
+            "model": model,
+            "base_precision": "bf16",
+            "quantization": "disabled",
+            "load_device": "main_device",
         }},
-        "2": {"class_type": "CLIPLoader", "inputs": {
-            "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-            "type": "wan",
+        # Load T5
+        "2": {"class_type": "LoadWanVideoT5TextEncoder", "inputs": {
+            "model_name": "umt5-xxl-enc-bf16.safetensors",
+            "precision": "bf16",
         }},
-        "3": {"class_type": "VAELoader", "inputs": {"vae_name": "wan2.2_vae.safetensors"}},
-        "10": {"class_type": "CLIPVisionLoader", "inputs": {"clip_name": "clip_vision_h.safetensors"}},
-        "11": {"class_type": "LoadImage", "inputs": {"image": inputs.get("image", "example.png")}},
-        "12": {"class_type": "CLIPVisionEncode", "inputs": {
-            "clip_vision": ["10", 0], "image": ["11", 0], "crop": "center",
+        # Load VAE
+        "3": {"class_type": "WanVideoVAELoader", "inputs": {
+            "model_name": _wan_vae_name(model),
+            "precision": "bf16",
         }},
-        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["2", 0]}},
-        "5": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["2", 0]}},
-        "6": {"class_type": "WanImageToVideo", "inputs": {
-            "positive": ["4", 0], "negative": ["5", 0], "vae": ["3", 0],
-            "width": params.get("width", 832),
-            "height": params.get("height", 480),
-            "length": params.get("frames", 81),
-            "batch_size": 1,
-            "clip_vision_output": ["12", 0],
+        # Load CLIP vision for image conditioning
+        "10": {"class_type": "LoadWanVideoClipTextEncoder", "inputs": {
+            "model_name": "clip_vision_h.safetensors",
+            "precision": "fp16",
+        }},
+        # Load start image
+        "11": {"class_type": "LoadImage", "inputs": {"image": image}},
+        # Encode text
+        "4": {"class_type": "WanVideoTextEncode", "inputs": {
+            "positive_prompt": prompt,
+            "negative_prompt": negative,
+            "t5": ["2", 0],
+            "force_offload": True,
+        }},
+        # Encode image + clip vision for I2V
+        "5": {"class_type": "WanVideoImageToVideoEncode", "inputs": {
+            "width": width,
+            "height": height,
+            "num_frames": num_frames,
+            "noise_aug_strength": 0.0,
+            "start_latent_strength": 1.0,
+            "end_latent_strength": 0.0,
+            "force_offload": True,
+            "vae": ["3", 0],
+            "clip_embeds": ["12", 0],
             "start_image": ["11", 0],
         }},
-        "7": {"class_type": "KSampler", "inputs": {
-            "model": ["1", 0], "positive": ["6", 0], "negative": ["6", 1],
-            "latent_image": ["6", 2],
-            "seed": _seed(params.get("seed", -1)),
+        # CLIP vision encode
+        "12": {"class_type": "WanVideoClipVisionEncode", "inputs": {
+            "clip_vision": ["10", 0],
+            "image_1": ["11", 0],
+            "strength_1": 1.0,
+            "strength_2": 0.0,
+            "crop": "center",
+            "combine_embeds": "average",
+            "force_offload": True,
+        }},
+        # Sample
+        "6": {"class_type": "WanVideoSampler", "inputs": {
+            "model": ["1", 0],
+            "image_embeds": ["5", 0],
             "steps": params.get("steps", 20),
             "cfg": params.get("guidance", 5.0),
-            "sampler_name": "euler",
-            "scheduler": "simple",
-            "denoise": 1.0,
+            "shift": 8.0,
+            "seed": _seed(params.get("seed", -1)),
+            "force_offload": True,
+            "scheduler": "unipc",
+            "riflex_freq_index": 0,
+            "text_embeds": ["4", 0],
         }},
-        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["7", 0], "vae": ["3", 0]}},
-        "9": {"class_type": "VHS_VideoCombine", "inputs": {
-            "images": ["8", 0],
+        # Decode
+        "7": {"class_type": "WanVideoDecode", "inputs": {
+            "vae": ["3", 0],
+            "samples": ["6", 0],
+            "enable_vae_tiling": True,
+            "tile_x": 480, "tile_y": 320,
+            "tile_stride_x": 240, "tile_stride_y": 160,
+        }},
+        # Combine to video
+        "8": {"class_type": "VHS_VideoCombine", "inputs": {
+            "images": ["7", 0],
             "frame_rate": 16,
             "loop_count": 0,
             "filename_prefix": "aiui_video",
