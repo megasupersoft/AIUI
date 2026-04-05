@@ -43,7 +43,15 @@ FRIENDLY_NAMES = {
     "Wan2.1/wan2.1_i2v_720p_14B_fp16.safetensors": "[Wan] 2.1 I2V 720p",
 }
 
-BROKEN_MODELS = {"flux2_dev_fp8mixed.safetensors", "hidream_i1_fast_fp8.safetensors"}
+BROKEN_MODELS = {
+    "flux2_dev_fp8mixed.safetensors",
+    "hidream_i1_fast_fp8.safetensors",
+    # Wan 2.2 I2V — incompatible channels with current WanVideoWrapper
+    "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+    "wan2.2_i2v_high_noise_14B_fp16.safetensors",
+    "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+    "wan2.2_i2v_low_noise_14B_fp16.safetensors",
+}
 
 # Which node types each model is compatible with
 # "image" = txt2img, img2img, inpaint
@@ -64,16 +72,12 @@ MODEL_CATEGORIES = {
     # Wan T2V
     "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors": ["t2v"],
     "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors": ["t2v"],
-    # Wan I2V
-    "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors": ["i2v"],
-    "wan2.2_i2v_high_noise_14B_fp16.safetensors": ["i2v"],
-    "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors": ["i2v"],
-    "wan2.2_i2v_low_noise_14B_fp16.safetensors": ["i2v"],
-    "Wan2.1/wan2.1_i2v_720p_14B_fp16.safetensors": ["i2v"],
+    # I2V uses LTX
+    "ltx-2.3-22b-distilled_fp8_v2.safetensors": ["t2v", "ltx", "i2v"],
     # Wan TI2V (first/last frame)
     "wan2.2_ti2v_5B_fp16.safetensors": ["ti2v"],
-    # LTX (video + audio)
-    "ltx-2.3-22b-distilled_fp8_v2.safetensors": ["t2v", "ltx"],
+    # LTX (video + audio + i2v)
+    # Already defined above with i2v category
 }
 
 # Node type → model category mapping

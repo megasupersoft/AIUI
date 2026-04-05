@@ -27,7 +27,7 @@ class ComfyUIExecutor(BaseExecutor):
         # Pre-process: upload any image URLs to ComfyUI's input folder
         device_id = params.get("_device") or None
         urls = get_worker_urls(device_id)
-        processed_inputs = await self._resolve_image_inputs(inputs, urls["http"])
+        processed_inputs = await self._resolve_image_inputs(inputs, urls["http"], on_progress)
 
         prompt = builder({**params, "_node_type": node_type}, processed_inputs)
 
@@ -42,26 +42,29 @@ class ComfyUIExecutor(BaseExecutor):
 
         return await self._queue_and_wait(prompt, node_labels, on_progress, urls, device_id or "")
 
-    async def _resolve_image_inputs(self, inputs: dict, http_base: str) -> dict:
+    async def _resolve_image_inputs(self, inputs: dict, http_base: str, on_progress: ProgressCallback = None) -> dict:
         """Convert image proxy URLs to ComfyUI input filenames by uploading."""
         resolved = dict(inputs)
         for key, value in inputs.items():
             if not isinstance(value, str):
                 continue
-            # Check if it's a proxy URL pointing to a ComfyUI image
             if "comfyui/view?" in value or "/view?" in value:
+                import urllib.parse
+                parsed = urllib.parse.urlparse(value)
+                qs = urllib.parse.parse_qs(parsed.query)
+                original_name = qs.get("filename", ["upload.png"])[0]
+
+                if on_progress:
+                    await on_progress("info", {"message": f"Uploading {original_name} to ComfyUI..."})
+
                 try:
-                    # Download the image from the proxy/comfyui
                     async with httpx.AsyncClient(timeout=30.0) as client:
                         img_res = await client.get(value)
                         img_res.raise_for_status()
                         img_data = img_res.content
 
-                        # Upload to ComfyUI's input folder
-                        import urllib.parse
-                        parsed = urllib.parse.urlparse(value)
-                        qs = urllib.parse.parse_qs(parsed.query)
-                        original_name = qs.get("filename", ["upload.png"])[0]
+                        if on_progress:
+                            await on_progress("info", {"message": f"Downloaded {len(img_data)//1024}KB, uploading to worker..."})
 
                         upload_res = await client.post(
                             f"{http_base}/upload/image",
@@ -71,15 +74,14 @@ class ComfyUIExecutor(BaseExecutor):
                         if upload_res.status_code == 200:
                             upload_data = upload_res.json()
                             resolved[key] = upload_data.get("name", original_name)
+                            if on_progress:
+                                await on_progress("info", {"message": f"Image uploaded as {resolved[key]}"})
                         else:
-                            # Fallback: try just the filename
                             resolved[key] = original_name
-                except Exception:
-                    # Fallback: extract filename from URL
-                    import urllib.parse
-                    parsed = urllib.parse.urlparse(value)
-                    qs = urllib.parse.parse_qs(parsed.query)
-                    resolved[key] = qs.get("filename", [value])[0]
+                except Exception as e:
+                    resolved[key] = original_name
+                    if on_progress:
+                        await on_progress("info", {"message": f"Image upload failed ({e}), using filename: {original_name}"})
         return resolved
 
     async def _queue_and_wait(
@@ -114,26 +116,45 @@ class ComfyUIExecutor(BaseExecutor):
 
         if on_progress:
             target_label = f" on {worker_name}" if worker_name else " (auto)"
-            # Build verbose summary of what we're sending
-            prompt_summary = []
-            for nid, nd in prompt.items():
-                if isinstance(nd, dict):
-                    ct = nd.get("class_type", "?")
-                    inp = nd.get("inputs", {})
-                    if ct == "CLIPTextEncode":
-                        prompt_summary.append(f'{ct}: "{inp.get("text", "")[:60]}"')
-                    elif ct in ("CheckpointLoaderSimple", "DiffusionModelLoaderKJ"):
-                        model_name = inp.get("ckpt_name") or inp.get("model_name", "?")
-                        prompt_summary.append(f'{ct}: {model_name}')
-                    elif ct == "KSampler":
-                        prompt_summary.append(f'KSampler: steps={inp.get("steps")}, cfg={inp.get("cfg")}, seed={inp.get("seed")}')
             await on_progress("comfyui_queued", {
                 "promptId": prompt_id,
                 "message": f"Queued{target_label} → {http_base}",
             })
-            # Send detailed prompt info as separate log
+            # Log every node in the prompt
+            prompt_lines = []
+            for nid in sorted(prompt.keys(), key=lambda x: int(x) if x.isdigit() else 999):
+                nd = prompt[nid]
+                if not isinstance(nd, dict):
+                    continue
+                ct = nd.get("class_type", "?")
+                inp = nd.get("inputs", {})
+                detail = ""
+                # Extract key info per node type
+                if "TextEncode" in ct or "CLIPTextEncode" in ct:
+                    text = inp.get("text") or inp.get("positive_prompt") or ""
+                    if text:
+                        detail = f' → "{text[:60]}"'
+                    neg = inp.get("negative_prompt", "")
+                    if neg:
+                        detail += f' neg="{neg[:30]}"'
+                elif "Loader" in ct or "CheckpointLoader" in ct:
+                    model_name = inp.get("ckpt_name") or inp.get("model_name") or inp.get("model") or inp.get("vae_name") or inp.get("clip_name") or ""
+                    if model_name:
+                        detail = f" → {model_name}"
+                elif ct == "KSampler":
+                    detail = f" steps={inp.get('steps')} cfg={inp.get('cfg')} seed={inp.get('seed')}"
+                elif "Sampler" in ct:
+                    detail = f" steps={inp.get('steps','')} cfg={inp.get('cfg','')} seed={inp.get('seed','')}"
+                elif "VideoCombine" in ct:
+                    detail = f" fps={inp.get('frame_rate','')} format={inp.get('format','')}"
+                elif "EmptyLatent" in ct or "EmptyEmbeds" in ct or "ImageToVideoEncode" in ct:
+                    w = inp.get("width", "")
+                    h = inp.get("height", "")
+                    f = inp.get("num_frames") or inp.get("length", "")
+                    if w: detail = f" {w}x{h} frames={f}"
+                prompt_lines.append(f"[{nid}] {ct}{detail}")
             await on_progress("info", {
-                "message": "ComfyUI prompt: " + " | ".join(prompt_summary),
+                "message": "Workflow: " + " → ".join(prompt_lines),
             })
 
         # Watch WebSocket for progress
@@ -206,12 +227,12 @@ class ComfyUIExecutor(BaseExecutor):
             cached = msg_data.get("nodes", [])
             if cached:
                 names = [node_labels.get(n, n) for n in cached]
-                await on_progress("comfyui_cached", {"message": f"Cached: {', '.join(names)}", "nodes": cached})
+                await on_progress("comfyui_cached", {"message": f"Cached ({len(cached)}): {', '.join(names)}"})
         elif msg_type == "executing":
             node_id = msg_data.get("node")
             if node_id:
                 label = node_labels.get(node_id, node_id)
-                await on_progress("comfyui_executing", {"message": f"Running: {label}", "comfyNodeId": node_id})
+                await on_progress("comfyui_executing", {"message": f"Running [{node_id}]: {label}", "comfyNodeId": node_id})
         elif msg_type == "progress":
             value = msg_data.get("value", 0)
             max_val = msg_data.get("max", 1)
@@ -219,12 +240,17 @@ class ComfyUIExecutor(BaseExecutor):
             label = node_labels.get(node_id, node_id)
             pct = round((value / max_val) * 100) if max_val > 0 else 0
             await on_progress("comfyui_progress", {
-                "message": f"Sampling: {label} [{value}/{max_val}] {pct}%",
+                "message": f"{label} [{value}/{max_val}] {pct}%",
                 "value": value, "max": max_val, "percent": pct, "comfyNodeId": node_id,
             })
         elif msg_type == "executed":
             node_id = msg_data.get("node", "")
             label = node_labels.get(node_id, node_id)
-            await on_progress("comfyui_executed", {"message": f"Done: {label}", "comfyNodeId": node_id})
+            output = msg_data.get("output", {})
+            output_keys = list(output.keys()) if output else []
+            detail = f" → {output_keys}" if output_keys else ""
+            await on_progress("comfyui_executed", {"message": f"Done [{node_id}]: {label}{detail}", "comfyNodeId": node_id})
         elif msg_type == "execution_success":
             await on_progress("comfyui_success", {"message": "ComfyUI prompt complete"})
+        elif msg_type == "execution_interrupted":
+            await on_progress("info", {"message": "ComfyUI execution interrupted"})
