@@ -6,6 +6,8 @@ DEFAULT_BACKENDS = {
     "text-input": "local",
     "number-input": "local",
     "image-input": "local",
+    "video-input": "local",
+    "audio-input": "local",
     "image-output": "local",
     "video-output": "local",
     "audio-output": "local",
@@ -22,7 +24,8 @@ DEFAULT_BACKENDS = {
     "music": "comfyui",
     "voice-clone": "comfyui",
     "generate-3d": "comfyui",
-    "upscale": "fal",
+    "upscale": "comfyui",
+    "image-generator-01": "comfyui",
     "remove-bg": "fal",
     "image-describer": "openai",
 }
