@@ -10,15 +10,22 @@ router = APIRouter()
 
 @router.get("/comfyui/ui")
 async def open_comfyui_ui(instance: str = "", workflow: str = ""):
-    """Redirect to the ComfyUI web UI on the selected (or auto) worker.
+    """Open ComfyUI web UI on the selected worker.
 
-    If `workflow` is given, appends ?open_workflow=<name> so the AIUI
-    frontend extension auto-loads that workflow in the ComfyUI editor.
+    If `workflow` is given, serves a small HTML page that navigates
+    to ComfyUI with a hash fragment. This avoids the redirect-hash
+    browser inconsistency.
     """
     urls = get_worker_urls(instance if instance else None)
-    target = urls["http"]
+    target = urls["http"].rstrip("/") + "/"
     if workflow:
         target += f"#{quote(workflow)}"
+        # Return an HTML page that navigates to the target with hash intact
+        return HTMLResponse(
+            f'<!DOCTYPE html><html><head><meta charset="utf-8">'
+            f'<script>window.location.replace("{target}");</script>'
+            f'</head><body></body></html>'
+        )
     return RedirectResponse(url=target)
 
 
