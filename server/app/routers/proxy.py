@@ -18,15 +18,11 @@ async def open_comfyui_ui(instance: str = "", workflow: str = ""):
     """
     urls = get_worker_urls(instance if instance else None)
     target = urls["http"].rstrip("/") + "/"
-    if workflow:
-        target += f"#{quote(workflow)}"
-        # Return an HTML page that navigates to the target with hash intact
-        return HTMLResponse(
-            f'<!DOCTYPE html><html><head><meta charset="utf-8">'
-            f'<script>window.location.replace("{target}");</script>'
-            f'</head><body></body></html>'
-        )
-    return RedirectResponse(url=target)
+    if not workflow:
+        return RedirectResponse(url=target)
+    # Pass workflow as a query param — the AIUI extension reads it
+    safe_wf = quote(workflow)
+    return RedirectResponse(url=f"{target}?aiui_workflow={safe_wf}")
 
 
 @router.post("/comfyui/graph")
