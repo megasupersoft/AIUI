@@ -1033,7 +1033,7 @@ function CanvasInner() {
         userSelect: "text",
       }}>
         <span>AIUI v0.1.0-dev</span>
-        <span>build {process.env.NEXT_PUBLIC_BUILD_ID || new Date().toISOString().slice(0, 16)}</span>
+        <span>build {process.env.NEXT_PUBLIC_BUILD_ID || "local"}</span>
       </div>
     </div>
   );
