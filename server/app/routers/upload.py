@@ -2,7 +2,7 @@ import os
 import uuid
 import httpx
 from fastapi import APIRouter, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from .._device_registry import get_worker_urls
 
 router = APIRouter()
@@ -76,4 +76,20 @@ async def upload_file(file: UploadFile = File(...)):
             f.write(content)
         return {"type": "video", "filename": local_name, "local": True}
 
+    if ext in [".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a", ".opus"]:
+        local_name = f"{uuid.uuid4().hex}{ext}"
+        path = os.path.join(UPLOAD_DIR, local_name)
+        with open(path, "wb") as f:
+            f.write(content)
+        return {"type": "audio", "filename": local_name, "local": True}
+
     return {"type": "unknown", "filename": filename}
+
+
+@router.get("/uploads/{filename}")
+async def serve_upload(filename: str):
+    path = os.path.join(UPLOAD_DIR, filename)
+    if not os.path.exists(path):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path)

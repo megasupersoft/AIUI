@@ -198,7 +198,7 @@ class ComfyUIExecutor(BaseExecutor):
                 subfolder = img.get("subfolder", "")
                 img_type = img.get("type", "output")
                 worker_param = f"&instance={worker_name}" if worker_name else ""
-                image_url = f"http://localhost:8000/comfyui/view?filename={filename}&subfolder={subfolder}&type={img_type}{worker_param}"
+                image_url = f"/comfyui/view?filename={filename}&subfolder={subfolder}&type={img_type}{worker_param}"
                 return {"image": image_url}
             if "gifs" in node_output:
                 # VHS_VideoCombine outputs as "gifs"
@@ -207,7 +207,7 @@ class ComfyUIExecutor(BaseExecutor):
                 subfolder = vid.get("subfolder", "")
                 vid_type = vid.get("type", "output")
                 worker_param = f"&instance={worker_name}" if worker_name else ""
-                video_url = f"http://localhost:8000/comfyui/view?filename={filename}&subfolder={subfolder}&type={vid_type}{worker_param}"
+                video_url = f"/comfyui/view?filename={filename}&subfolder={subfolder}&type={vid_type}{worker_param}"
                 return {"video": video_url, "image": video_url}
             if "audio" in node_output:
                 aud = node_output["audio"][0]
@@ -215,7 +215,7 @@ class ComfyUIExecutor(BaseExecutor):
                 subfolder = aud.get("subfolder", "")
                 aud_type = aud.get("type", "output")
                 worker_param = f"&instance={worker_name}" if worker_name else ""
-                audio_url = f"http://localhost:8000/comfyui/view?filename={filename}&subfolder={subfolder}&type={aud_type}{worker_param}"
+                audio_url = f"/comfyui/view?filename={filename}&subfolder={subfolder}&type={aud_type}{worker_param}"
                 return {"audio": audio_url}
 
         raise RuntimeError("No output found in ComfyUI result")

@@ -104,7 +104,7 @@ function CanvasInner() {
 
   // Fetch available GPU devices and checkpoints on mount
   useEffect(() => {
-    fetch("http://localhost:8000/devices")
+    fetch("/devices")
       .then((r) => r.json())
       .then((data) => {
         if (data.devices) {
@@ -116,7 +116,7 @@ function CanvasInner() {
     const nodeTypes = ["txt2img", "img2img", "txt2vid", "img2vid", "vid2vid", "vid-audio"];
     Promise.all(
       nodeTypes.map((nt) =>
-        fetch(`http://localhost:8000/models/checkpoints?node_type=${nt}`)
+        fetch(`/models/checkpoints?node_type=${nt}`)
           .then((r) => r.json())
           .then((data) => ({ type: nt, models: data.checkpoints || [] }))
           .catch(() => ({ type: nt, models: [] }))
@@ -535,7 +535,7 @@ function CanvasInner() {
         const formData = new FormData();
         formData.append("file", file);
         try {
-          const res = await fetch("http://localhost:8000/upload/file", { method: "POST", body: formData });
+          const res = await fetch("/upload/file", { method: "POST", body: formData });
           const data = await res.json();
           if (data.type === "image" && data.filename) {
             const id = String(++nodeIdCounter.current);
@@ -547,19 +547,41 @@ function CanvasInner() {
           }
         } catch {}
       } else if (["mp4", "webm", "mov", "avi", "mkv"].includes(ext)) {
-        // Create a placeholder video node
-        const id = String(++nodeIdCounter.current);
-        setNodes((nds) => [...nds, {
-          id, type: "aiuiNode", position: pos,
-          data: { nodeType: "image-input", params: { image: null } },
-        }]);
-        offsetY += 200;
+        const formData = new FormData();
+        formData.append("file", file);
+        try {
+          const res = await fetch("/upload/file", { method: "POST", body: formData });
+          const data = await res.json();
+          if (data.type === "video" && data.filename) {
+            const id = String(++nodeIdCounter.current);
+            setNodes((nds) => [...nds, {
+              id, type: "aiuiNode", position: pos,
+              data: { nodeType: "video-input", params: { video: data.filename } },
+            }]);
+            offsetY += 200;
+          }
+        } catch {}
+      } else if (["mp3", "wav", "ogg", "flac", "aac", "m4a", "opus"].includes(ext)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        try {
+          const res = await fetch("/upload/file", { method: "POST", body: formData });
+          const data = await res.json();
+          if (data.type === "audio" && data.filename) {
+            const id = String(++nodeIdCounter.current);
+            setNodes((nds) => [...nds, {
+              id, type: "aiuiNode", position: pos,
+              data: { nodeType: "audio-input", params: { audio: data.filename } },
+            }]);
+            offsetY += 200;
+          }
+        } catch {}
       } else if (["txt", "md", "markdown", "text", "csv", "json", "yaml", "yml"].includes(ext)) {
         // Read text content and create Text node
         const formData = new FormData();
         formData.append("file", file);
         try {
-          const res = await fetch("http://localhost:8000/upload/file", { method: "POST", body: formData });
+          const res = await fetch("/upload/file", { method: "POST", body: formData });
           const data = await res.json();
           if (data.type === "text" && data.content) {
             const id = String(++nodeIdCounter.current);
@@ -617,7 +639,7 @@ function CanvasInner() {
     ));
 
     try {
-      const res = await fetch("http://localhost:8000/execute", {
+      const res = await fetch("/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ graph, fromNodeId }),

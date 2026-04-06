@@ -1,23 +1,35 @@
-version: "3.9"
-
 services:
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    depends_on:
-      - server
-
   server:
     build:
       context: ./server
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
     env_file:
       - .env
     volumes:
-      - ./server/workflows:/app/workflows
+      - /mnt/pool_01:/mnt/pool_01
+      - ./server/uploads:/app/uploads
+    networks:
+      - aiui
+
+  web:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    networks:
+      - aiui
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "3080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - aiui
+
+networks:
+  aiui:
+    driver: bridge

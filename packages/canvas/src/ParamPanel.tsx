@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { getNode, NodeDef, ParamDef, CATEGORY_COLORS } from "@aiui/nodes";
 import { THEME } from "./theme";
 import * as Icons from "lucide-react";
@@ -251,6 +251,18 @@ function ParamField({
     );
   }
 
+  if (def.type === "image") {
+    return <ImageParamField label={def.label} value={value} onChange={onChange} wrapStyle={wrapStyle} labelStyle={labelStyle} />;
+  }
+
+  if (def.type === "video") {
+    return <VideoParamField label={def.label} value={value} onChange={onChange} wrapStyle={wrapStyle} labelStyle={labelStyle} />;
+  }
+
+  if (def.type === "audio") {
+    return <AudioParamField label={def.label} value={value} onChange={onChange} wrapStyle={wrapStyle} labelStyle={labelStyle} />;
+  }
+
   // string / fallback
   return (
     <div style={wrapStyle}>
@@ -262,6 +274,171 @@ function ParamField({
         onChange={(e) => onChange(e.target.value)}
         style={inputStyle}
       />
+    </div>
+  );
+}
+
+function ImageParamField({ label, value, onChange, wrapStyle, labelStyle }: {
+  label: string;
+  value: any;
+  onChange: (v: any) => void;
+  wrapStyle: React.CSSProperties;
+  labelStyle: React.CSSProperties;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/upload/file", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.type === "image") onChange(data.filename);
+    } catch {}
+    e.target.value = "";
+  }
+
+  return (
+    <div style={wrapStyle}>
+      <label style={labelStyle}>{label}</label>
+      {value && (
+        <img
+          src={`/comfyui/view?filename=${encodeURIComponent(value)}&type=input`}
+          alt={value}
+          style={{ width: "100%", borderRadius: 6, marginBottom: 8, display: "block", objectFit: "cover", maxHeight: 180 }}
+        />
+      )}
+      <button
+        onClick={() => fileRef.current?.click()}
+        style={{
+          width: "100%",
+          padding: "7px 10px",
+          background: THEME.inputBg,
+          border: `1px solid ${THEME.panelBorder}`,
+          borderRadius: 6,
+          color: THEME.textSecondary,
+          fontSize: 13,
+          fontFamily: THEME.fontSans,
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        {value ? "Replace image…" : "Upload image…"}
+      </button>
+      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+    </div>
+  );
+}
+
+function VideoParamField({ label, value, onChange, wrapStyle, labelStyle }: {
+  label: string;
+  value: any;
+  onChange: (v: any) => void;
+  wrapStyle: React.CSSProperties;
+  labelStyle: React.CSSProperties;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/upload/file", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.type === "video") onChange(data.filename);
+    } catch {}
+    e.target.value = "";
+  }
+
+  return (
+    <div style={wrapStyle}>
+      <label style={labelStyle}>{label}</label>
+      {value && (
+        <div style={{ color: THEME.textPrimary, fontSize: 13, marginBottom: 8, wordBreak: "break-all" }}>
+          {value}
+        </div>
+      )}
+      <button
+        onClick={() => fileRef.current?.click()}
+        style={{
+          width: "100%",
+          padding: "7px 10px",
+          background: THEME.inputBg,
+          border: `1px solid ${THEME.panelBorder}`,
+          borderRadius: 6,
+          color: THEME.textSecondary,
+          fontSize: 13,
+          fontFamily: THEME.fontSans,
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        {value ? "Replace video…" : "Upload video…"}
+      </button>
+      <input ref={fileRef} type="file" accept="video/*" style={{ display: "none" }} onChange={handleFile} />
+    </div>
+  );
+}
+
+function AudioParamField({ label, value, onChange, wrapStyle, labelStyle }: {
+  label: string;
+  value: any;
+  onChange: (v: any) => void;
+  wrapStyle: React.CSSProperties;
+  labelStyle: React.CSSProperties;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/upload/file", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.type === "audio") onChange(data.filename);
+    } catch {}
+    e.target.value = "";
+  }
+
+  return (
+    <div style={wrapStyle}>
+      <label style={labelStyle}>{label}</label>
+      {value && (
+        <>
+          <div style={{ color: THEME.textPrimary, fontSize: 13, marginBottom: 6, wordBreak: "break-all" }}>
+            {value}
+          </div>
+          <audio
+            controls
+            src={`/uploads/${encodeURIComponent(value)}`}
+            style={{ width: "100%", marginBottom: 8 }}
+          />
+        </>
+      )}
+      <button
+        onClick={() => fileRef.current?.click()}
+        style={{
+          width: "100%",
+          padding: "7px 10px",
+          background: THEME.inputBg,
+          border: `1px solid ${THEME.panelBorder}`,
+          borderRadius: 6,
+          color: THEME.textSecondary,
+          fontSize: 13,
+          fontFamily: THEME.fontSans,
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        {value ? "Replace audio…" : "Upload audio…"}
+      </button>
+      <input ref={fileRef} type="file" accept="audio/*" style={{ display: "none" }} onChange={handleFile} />
     </div>
   );
 }

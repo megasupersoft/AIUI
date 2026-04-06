@@ -8,6 +8,7 @@ export type SocketType =
   | "latent"
   | "model"
   | "video"
+  | "audio"
   | "any";
 
 export const SOCKET_COLORS: Record<SocketType, string> = {
@@ -18,6 +19,7 @@ export const SOCKET_COLORS: Record<SocketType, string> = {
   latent: "#a07078",   // muted rose
   model:  "#a09860",   // muted gold
   video:  "#6098a0",   // muted cyan
+  audio:  "#c07898",   // muted pink
   any:    "#8a8a96",   // muted slate
 };
 
@@ -46,6 +48,8 @@ export type ParamType =
   | "select"
   | "boolean"
   | "image"       // image upload widget
+  | "video"       // video upload widget
+  | "audio"       // audio upload widget
   | "model_ref";  // references a model from the backend's model list
 
 export interface ParamDef {
@@ -131,6 +135,9 @@ export interface NodeDef {
 
   /** Node dimensions hint */
   width?: number;
+
+  /** Name of the source ComfyUI workflow file (without .json), for the "Open in ComfyUI" button */
+  comfyuiWorkflow?: string;
 }
 
 // ─── Graph Types (serialised canvas state) ───────────────────────────────────

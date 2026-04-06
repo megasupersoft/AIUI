@@ -36,7 +36,10 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
   const isTextInput = data.nodeType === "text-input";
   const isPromptBuilder = data.nodeType === "prompt-builder";
   const isImageDisplay = data.nodeType === "image-output" || data.nodeType === "image-input";
-  const hasImageOutput = isImageDisplay && data.outputImages?.image;
+  const hasImageOutput = !!data.outputImages?.image;
+  const inputImageSrc = data.nodeType === "image-input" && data.params?.image
+    ? `/comfyui/view?filename=${encodeURIComponent(data.params.image)}&type=input`
+    : null;
 
   // Can this node be "run"? Only nodes with a non-local backend
   const isRunnable = def.defaultBackend !== "local";
@@ -114,7 +117,7 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
     }
   }, [data.onRunNode, id]);
 
-  const cardMinHeight = isPromptBuilder ? 300 : isTextInput ? 120 : hasImageOutput ? 100 : 56;
+  const cardMinHeight = isPromptBuilder ? 300 : isTextInput ? 120 : (hasImageOutput || inputImageSrc) ? 100 : 56;
 
   return (
     <div style={{ fontFamily: THEME.fontSans, position: "relative" }}>
@@ -174,6 +177,32 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
           </span>
         )}
         <div style={{ flex: 1 }} />
+        {def.backends?.comfyui && (
+          <a
+            href={`/comfyui/ui${def.comfyuiWorkflow ? `?workflow=${encodeURIComponent(def.comfyuiWorkflow)}` : ""}`}
+            target="_blank"
+            rel="noreferrer"
+            title={def.comfyuiWorkflow ? `Open "${def.comfyuiWorkflow}" in ComfyUI` : "Open in ComfyUI"}
+            className="nodrag"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+              color: THEME.textMuted,
+              fontSize: 10,
+              fontFamily: THEME.fontSans,
+              textDecoration: "none",
+              opacity: 0.6,
+              transition: "opacity 0.15s",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.6"; }}
+          >
+            <Icons.Workflow size={11} />
+          </a>
+        )}
       </div>
 
       {/* ── Card body ── */}
@@ -260,9 +289,9 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
           />
         )}
 
-        {hasImageOutput && (
+        {(hasImageOutput || inputImageSrc) && (
           <img
-            src={data.outputImages!.image}
+            src={hasImageOutput ? data.outputImages!.image : inputImageSrc!}
             alt="output"
             style={{
               width: "100%",
@@ -318,7 +347,7 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
         )}
 
         {/* Empty card body for nodes without inline content */}
-        {!isTextInput && !isPromptBuilder && !hasImageOutput && !data.progress && (
+        {!isTextInput && !isPromptBuilder && !hasImageOutput && !inputImageSrc && !data.progress && (
           <div style={{ minHeight: cardMinHeight }} />
         )}
 

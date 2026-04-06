@@ -1,0 +1,7 @@
+:80 {
+    @api {
+        path /execute* /devices* /models* /upload* /uploads* /comfyui* /health* /workflows*
+    }
+    reverse_proxy @api server:8000
+    reverse_proxy web:3000
+}

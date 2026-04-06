@@ -445,6 +445,134 @@ def build_ace_music(params: dict, inputs: dict) -> dict:
     }
 
 
+# ─── Image Generator 01 (SD1.5 + rgthree LoRA stack, euler/karras) ───────────
+
+def build_image_generator_01(params: dict, inputs: dict) -> dict:
+    prompt = inputs.get("prompt") or params.get("prompt", "")
+    negative = inputs.get("negative") or params.get("negative", "")
+    ckpt = params.get("checkpoint", "analogMadness_v70.safetensors")
+    lora_1 = params.get("lora_1", "epiCRealLife.safetensors")
+    lora_1_w = params.get("lora_1_weight", 0.6)
+    lora_2 = params.get("lora_2", "Nlo_CinematicLookEnhancer_v1.safetensors")
+    lora_2_w = params.get("lora_2_weight", 0.95)
+    lora_3 = params.get("lora_3", "polyhdron_all_in_one_eyes_hands_skin_fin.safetensors")
+    lora_3_w = params.get("lora_3_weight", 0.3)
+    return {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
+        # LoRA stack (rgthree) — modifies CLIP only (MODEL bypassed as in original workflow)
+        "2": {"class_type": "Lora Loader Stack (rgthree)", "inputs": {
+            "model": ["1", 0],
+            "clip":  ["1", 1],
+            "lora_01": lora_1,  "strength_01": lora_1_w,
+            "lora_02": lora_2,  "strength_02": lora_2_w,
+            "lora_03": lora_3,  "strength_03": lora_3_w,
+            "lora_04": "None",  "strength_04": 1.0,
+        }},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt,   "clip": ["2", 1]}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": ["2", 1]}},
+        "5": {"class_type": "EmptyLatentImage", "inputs": {
+            "width":      params.get("width",  768),
+            "height":     params.get("height", 1024),
+            "batch_size": 1,
+        }},
+        "6": {"class_type": "KSampler", "inputs": {
+            "model":        ["1", 0],   # checkpoint MODEL (LoRA stack MODEL output unused, matching original)
+            "positive":     ["3", 0],
+            "negative":     ["4", 0],
+            "latent_image": ["5", 0],
+            "seed":         _seed(params.get("seed", -1)),
+            "steps":        params.get("steps", 50),
+            "cfg":          params.get("cfg", 6.0),
+            "sampler_name": params.get("sampler", "euler"),
+            "scheduler":    params.get("scheduler", "karras"),
+            "denoise":      1.0,
+        }},
+        "7": {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}},
+        "8": {"class_type": "SaveImage", "inputs": {"images": ["7", 0], "filename_prefix": "aiui_ig01"}},
+    }
+
+
+# ─── Image Upscaler 01 (UltimateSDUpscale + ControlNet tile + rgthree LoRA) ──
+
+def build_image_upscaler_01(params: dict, inputs: dict) -> dict:
+    image  = inputs.get("image", "example.png")
+    prompt = inputs.get("prompt") or params.get("prompt", "")
+    scale  = float(params.get("scale", 2))
+    steps  = params.get("steps", 50)
+    return {
+        "1": {"class_type": "UpscaleModelLoader", "inputs": {
+            "model_name": "4x-UltraSharp.pth",
+        }},
+        "2": {"class_type": "ControlNetLoader", "inputs": {
+            "control_net_name": "control_v11f1e_sd15_tile_fp16.safetensors",
+        }},
+        "3": {"class_type": "CheckpointLoaderSimple", "inputs": {
+            "ckpt_name": "realisticVisionV60B1_v51HyperVAE.safetensors",
+        }},
+        "4": {"class_type": "Lora Loader Stack (rgthree)", "inputs": {
+            "model": ["3", 0], "clip": ["3", 1],
+            "lora_01": "epiCRealLife.safetensors",      "strength_01": 0.8,
+            "lora_02": "age_slider-LECO-v1.safetensors", "strength_02": -2.56,
+            "lora_03": "None", "strength_03": 1.0,
+            "lora_04": "None", "strength_04": 1.0,
+        }},
+        "5": {"class_type": "CLIPTextEncode", "inputs": {
+            "text": prompt, "clip": ["4", 1],
+        }},
+        "6": {"class_type": "CLIPTextEncode", "inputs": {
+            "text": "blurry, low resolution, overexposed, underexposed, oversaturated, flat lighting, cartoon, anime, painting, illustration, CGI, 3D render, plastic skin, smooth skin, bad anatomy, unnatural face, uncanny valley, bad proportions, distorted, jpeg artifacts, unrealistic lighting,",
+            "clip": ["4", 1],
+        }},
+        "7": {"class_type": "LoadImage", "inputs": {"image": image}},
+        "8": {"class_type": "ControlNetApplyAdvanced", "inputs": {
+            "positive": ["5", 0], "negative": ["6", 0],
+            "control_net": ["2", 0],
+            "image": ["7", 0],
+            "vae": ["3", 2],
+            "strength": 0.2,
+            "start_percent": 0,
+            "end_percent": 0.6,
+        }},
+        "9": {"class_type": "UltimateSDUpscale", "inputs": {
+            "image": ["7", 0],
+            "model": ["4", 0],
+            "positive": ["8", 0],
+            "negative": ["8", 1],
+            "vae": ["3", 2],
+            "upscale_model": ["1", 0],
+            "upscale_by": scale,
+            "seed": _seed(params.get("seed", -1)),
+            "steps": steps,
+            "cfg": 6.0,
+            "sampler_name": "dpm_2",
+            "scheduler": "karras",
+            "denoise": 0.2,
+            "mode_type": "Linear",
+            "tile_width": 512,
+            "tile_height": 512,
+            "mask_blur": 8,
+            "tile_padding": 32,
+            "seam_fix_mode": "None",
+            "seam_fix_denoise": 0.35,
+            "seam_fix_width": 64,
+            "seam_fix_mask_blur": 8,
+            "seam_fix_padding": 16,
+            "force_uniform_tiles": True,
+            "tiled_decode": False,
+        }},
+        "10": {"class_type": "ImageSharpen", "inputs": {
+            "image": ["9", 0],
+            "sharpen_radius": 1,
+            "sigma": 0.2,
+            "alpha": 0.25,
+        }},
+        "11": {"class_type": "SaveImage", "inputs": {
+            "images": ["10", 0],
+            "filename_prefix": "aiui_upscale",
+        }},
+    }
+
+
 # ─── Workflow dispatcher ─────────────────────────────────────────────────────
 
 def build_txt2img(params: dict, inputs: dict) -> dict:
@@ -476,7 +604,144 @@ def build_txt2vid(params: dict, inputs: dict) -> dict:
         return build_wan_t2v(params, inputs)
 
 
+def build_wan_i2v(params: dict, inputs: dict) -> dict:
+    """Wan Video 01 — Image-to-Video using WanVideoWrapper nodes + FILM VFI."""
+    prompt   = inputs.get("prompt") or params.get("prompt", "")
+    negative = inputs.get("negative") or params.get("negative", "")
+    image    = inputs.get("image", "example.png")
+    model    = params.get("model", "Wan2.1/wan2.1_i2v_720p_14B_fp16.safetensors")
+    num_frames = min(params.get("frames", 81), 81)
+    return {
+        # ── Loaders ──────────────────────────────────────────────────────────
+        "1": {"class_type": "CLIPVisionLoader", "inputs": {
+            "clip_name": "clip_vision_h.safetensors",
+        }},
+        "2": {"class_type": "WanVideoBlockSwap", "inputs": {
+            "blocks_to_swap": 10,
+            "offload_img_emb": False,
+            "offload_txt_emb": False,
+            "use_non_blocking": True,
+            "vace_blocks_to_swap": 0,
+            "prefetch_blocks": 0,
+            "block_swap_debug": False,
+        }},
+        "3": {"class_type": "WanVideoLoraSelect", "inputs": {
+            "lora": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+            "strength": 1,
+            "low_mem_load": True,
+        }},
+        "4": {"class_type": "WanVideoModelLoader", "inputs": {
+            "model": model,
+            "base_precision": "fp16",
+            "quantization": "fp8_e4m3fn",
+            "load_device": "offload_device",
+            "attention_mode": "sdpa",
+            "block_swap_args": ["2", 0],
+            "lora": ["3", 0],
+        }},
+        "5": {"class_type": "WanVideoVAELoader", "inputs": {
+            "model_name": "Wan2_1_VAE_bf16.safetensors",
+            "precision": "bf16",
+            "use_cpu_cache": False,
+            "verbose": False,
+        }},
+        "6": {"class_type": "LoadWanVideoT5TextEncoder", "inputs": {
+            "model_name": "umt5-xxl-enc-bf16.safetensors",
+            "precision": "bf16",
+            "load_device": "offload_device",
+            "quantization": "disabled",
+        }},
+        # ── Image input ───────────────────────────────────────────────────────
+        "7": {"class_type": "LoadImage", "inputs": {"image": image}},
+        "8": {"class_type": "ImageResizeKJv2", "inputs": {
+            "image": ["7", 0],
+            "width": 576,
+            "height": 812,
+            "upscale_method": "lanczos",
+            "keep_proportion": "crop",
+            "pad_color": "0, 0, 0",
+            "crop_position": "center",
+            "divisible_by": 16,
+            "device": "cpu",
+        }},
+        # ── Encode ────────────────────────────────────────────────────────────
+        "9": {"class_type": "WanVideoClipVisionEncode", "inputs": {
+            "clip_vision": ["1", 0],
+            "image_1": ["8", 0],
+            "strength_1": 1,
+            "strength_2": 1,
+            "crop": "center",
+            "combine_embeds": "average",
+            "force_offload": True,
+        }},
+        "10": {"class_type": "WanVideoTextEncode", "inputs": {
+            "positive_prompt": prompt,
+            "negative_prompt": negative,
+            "t5": ["6", 0],
+            "model_to_offload": ["4", 0],
+            "force_offload": True,
+            "use_disk_cache": False,
+            "device": "gpu",
+        }},
+        "11": {"class_type": "WanVideoImageToVideoEncode", "inputs": {
+            "vae": ["5", 0],
+            "clip_embeds": ["9", 0],
+            "start_image": ["8", 0],
+            "width": ["8", 1],
+            "height": ["8", 2],
+            "num_frames": num_frames,
+            "noise_aug_strength": 0.03,
+            "start_latent_strength": 1,
+            "end_latent_strength": 1,
+            "force_offload": True,
+        }},
+        # ── Sample ────────────────────────────────────────────────────────────
+        "12": {"class_type": "WanVideoSampler", "inputs": {
+            "model": ["4", 0],
+            "image_embeds": ["11", 0],
+            "text_embeds": ["10", 0],
+            "steps": params.get("steps", 8),
+            "cfg": params.get("guidance", 1.0),
+            "shift": 5,
+            "seed": _seed(params.get("seed", -1)),
+            "force_offload": True,
+            "scheduler": "dpm++_sde",
+            "riflex_freq_index": 0,
+        }},
+        # ── Decode → FILM VFI → output ────────────────────────────────────────
+        "13": {"class_type": "WanVideoDecode", "inputs": {
+            "vae": ["5", 0],
+            "samples": ["12", 0],
+            "enable_vae_tiling": False,
+            "tile_x": 272,
+            "tile_y": 272,
+            "tile_stride_x": 144,
+            "tile_stride_y": 128,
+        }},
+        "14": {"class_type": "FILM VFI", "inputs": {
+            "frames": ["13", 0],
+            "ckpt_name": "film_net_fp32.pt",
+            "clear_cache_after_n_frames": 10,
+            "multiplier": 2,
+        }},
+        "15": {"class_type": "VHS_VideoCombine", "inputs": {
+            "images": ["14", 0],
+            "frame_rate": 30,
+            "loop_count": 0,
+            "filename_prefix": "aiui_wan_i2v",
+            "format": "video/h264-mp4",
+            "pingpong": False,
+            "save_output": True,
+        }},
+    }
+
+
 def build_img2vid(params: dict, inputs: dict) -> dict:
+    model = params.get("model", "Wan2.1/wan2.1_i2v_720p_14B_fp16.safetensors")
+    arch = detect_arch(model)
+    if arch == "wan_i2v":
+        return build_wan_i2v(params, inputs)
+    # Fallback — LTX I2V
     return build_ltx_i2v(params, inputs)
 
 
@@ -503,6 +768,9 @@ def build_not_implemented(params: dict, inputs: dict) -> dict:
 
 
 WORKFLOW_BUILDERS = {
+    "image-generator-01": build_image_generator_01,
+    "image-upscaler-01": build_image_upscaler_01,
+    "upscale": build_image_upscaler_01,
     "txt2img": build_txt2img,
     "img2img": build_img2img,
     "inpaint": build_sd15_txt2img,  # TODO: proper inpaint workflow

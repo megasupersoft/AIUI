@@ -3,7 +3,7 @@ import { NodeDef } from "../../types";
 export const upscaleNode: NodeDef = {
   id: "upscale",
   label: "Upscale",
-  description: "Upscale an image using Real-ESRGAN",
+  description: "Upscale an image using Ultimate SD Upscale + ControlNet tile",
   category: "process",
   icon: "ZoomIn",
   inputs: {
@@ -16,22 +16,26 @@ export const upscaleNode: NodeDef = {
     scale: {
       type: "select",
       label: "Scale",
-      default: "4",
+      default: "2",
       options: [
-        { label: "2\u00d7", value: "2" },
-        { label: "4\u00d7", value: "4" },
+        { label: "2×", value: "2" },
+        { label: "4×", value: "4" },
       ],
       appModeVisible: true,
     },
-  },
-  backends: {
-    fal: {
-      modelId: "fal-ai/esrgan",
-      paramMap: { scale: "scale" },
-      outputMap: { image: "image.url" },
+    prompt: {
+      type: "prompt",
+      label: "Prompt",
+      default: "",
+      placeholder: "Optional detail prompt...",
+      appModeVisible: false,
     },
+    steps: { type: "slider", label: "Steps", default: 50, min: 10, max: 100, step: 5 },
+    seed: { type: "number", label: "Seed (-1 = random)", default: -1 },
   },
-  defaultBackend: "fal",
+  backends: { comfyui: true },
+  defaultBackend: "comfyui",
+  comfyuiWorkflow: "Image Upscaler 01",
   exposedParams: ["scale"],
   width: 280,
 };

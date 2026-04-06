@@ -9,6 +9,10 @@ class LocalExecutor(BaseExecutor):
             return {"number": params.get("value", 0)}
         elif node_type == "image-input":
             return {"image": params.get("image")}
+        elif node_type == "video-input":
+            return {"video": params.get("video")}
+        elif node_type == "audio-input":
+            return {"audio": params.get("audio")}
         elif node_type == "image-output":
             return {"image": inputs.get("image")}
         elif node_type == "video-output":
