@@ -7,6 +7,7 @@ import * as Icons from "lucide-react";
 interface GraphPopoverProps {
   nodeType: string;
   device?: string;
+  workflow?: string;
   onClose: () => void;
 }
 
@@ -58,7 +59,7 @@ function getSnapRect(zone: SnapZone): { x: number; y: number; w: number; h: numb
   }
 }
 
-export function GraphPopover({ nodeType, device, onClose }: GraphPopoverProps) {
+export function GraphPopover({ nodeType, device, workflow, onClose }: GraphPopoverProps) {
   // Initial centered position
   const initW = Math.min(1200, window.innerWidth * 0.9);
   const initH = Math.min(800, window.innerHeight * 0.85);
@@ -160,7 +161,7 @@ export function GraphPopover({ nodeType, device, onClose }: GraphPopoverProps) {
     }
   }, [pos]);
 
-  const src = `/comfyui/ui?instance=${encodeURIComponent(device || "")}`;
+  const src = `/comfyui/ui?instance=${encodeURIComponent(device || "")}${workflow ? `&workflow=${encodeURIComponent(workflow)}` : ""}`;
   const previewRect = getSnapRect(snapPreview);
 
   // Resize handle shared style

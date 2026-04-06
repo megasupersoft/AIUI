@@ -89,7 +89,7 @@ function CanvasInner() {
   const [nodeContextMenu, setNodeContextMenu] = useState<{
     x: number; y: number; nodeId: string; nodeType: string; params: Record<string, any>;
   } | null>(null);
-  const [graphPopover, setGraphPopover] = useState<{ nodeType: string; device?: string } | null>(null);
+  const [graphPopover, setGraphPopover] = useState<{ nodeType: string; device?: string; workflow?: string } | null>(null);
   const [isCutting, setIsCutting] = useState(false);
   const [cutLine, setCutLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const [devices, setDevices] = useState<{ id: string; label: string; gpu: string; name: string; vramFree: number }[]>([]);
@@ -975,7 +975,7 @@ function CanvasInner() {
                 onClose={() => setNodeContextMenu(null)}
                 onDelete={handleDeleteNode}
                 onDuplicate={handleDuplicateNode}
-                onViewGraph={(nodeType, device) => setGraphPopover({ nodeType, device })}
+                onViewGraph={(nodeType, device, workflow) => setGraphPopover({ nodeType, device, workflow })}
               />
             )}
 
@@ -984,6 +984,7 @@ function CanvasInner() {
               <GraphPopover
                 nodeType={graphPopover.nodeType}
                 device={graphPopover.device}
+                workflow={graphPopover.workflow}
                 onClose={() => setGraphPopover(null)}
               />
             )}

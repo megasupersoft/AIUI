@@ -14,7 +14,7 @@ interface NodeContextMenuProps {
   onClose: () => void;
   onDelete: (nodeId: string) => void;
   onDuplicate: (nodeId: string) => void;
-  onViewGraph: (nodeType: string, device?: string) => void;
+  onViewGraph: (nodeType: string, device?: string, workflow?: string) => void;
 }
 
 export function NodeContextMenu({
@@ -52,7 +52,7 @@ export function NodeContextMenu({
       label: "Open in ComfyUI",
       onClick: () => {
         onClose();
-        onViewGraph(nodeType, params?._device || "");
+        onViewGraph(nodeType, params?._device || "", def.comfyuiWorkflow || "");
       },
     });
   }
