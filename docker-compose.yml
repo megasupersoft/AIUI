@@ -8,6 +8,8 @@ services:
     volumes:
       - /mnt/pool_01:/mnt/pool_01
       - ./server/uploads:/app/uploads
+    extra_hosts:
+      - "skeletor:host-gateway"
     networks:
       - aiui
 

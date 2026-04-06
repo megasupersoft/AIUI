@@ -1,7 +1,7 @@
 from typing import Optional, Dict
 import httpx
 
-WORKERS_URL  = "http://skeletor/workers.json"
+WORKERS_URL  = "http://skeletor:8080/workers.json"
 COMFYUI_BASE = "http://comfyui.skeletor"
 
 # name → proxy path, e.g. "work0020" → "/worker/work0020"

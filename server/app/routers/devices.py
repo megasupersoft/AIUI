@@ -4,7 +4,7 @@ from .._device_registry import refresh_workers, get_cached_workers
 
 router = APIRouter()
 
-WORKERS_URL = "http://skeletor/workers.json"
+WORKERS_URL = "http://skeletor:8080/workers.json"
 
 @router.get("/devices")
 async def list_devices():

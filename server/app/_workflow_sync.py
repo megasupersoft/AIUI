@@ -25,7 +25,7 @@ SKELETOR_HOST   = "skeletor"
 SKELETOR_USER   = "admin"
 SKELETOR_PASS   = os.getenv("SKELETOR_PASSWORD", "3Illiams3Illiams!")
 NAS_WORKFLOWS   = "/mnt/pool_01/comfyui/ComfyUI/user/default/workflows"
-WORKERS_URL     = "http://skeletor/workers.json"
+WORKERS_URL     = "http://skeletor:8080/workers.json"
 
 
 def _sftp_existing(sftp) -> set[str]:
