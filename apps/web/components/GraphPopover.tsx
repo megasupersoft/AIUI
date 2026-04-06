@@ -60,6 +60,24 @@ function getSnapRect(zone: SnapZone): { x: number; y: number; w: number; h: numb
 }
 
 export function GraphPopover({ nodeType, device, workflow, onClose }: GraphPopoverProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Send workflow to ComfyUI iframe via postMessage after it loads
+  const onIframeLoad = useCallback(() => {
+    if (!workflow || !iframeRef.current?.contentWindow) return;
+    const send = () => {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "aiui_load_workflow", workflow },
+        "*"
+      );
+    };
+    // Send multiple times to handle ComfyUI's async init
+    send();
+    setTimeout(send, 1000);
+    setTimeout(send, 2000);
+    setTimeout(send, 4000);
+  }, [workflow]);
+
   // Initial centered position
   const initW = Math.min(1200, window.innerWidth * 0.9);
   const initH = Math.min(800, window.innerHeight * 0.85);
@@ -161,7 +179,7 @@ export function GraphPopover({ nodeType, device, workflow, onClose }: GraphPopov
     }
   }, [pos]);
 
-  const src = `/comfyui/ui?instance=${encodeURIComponent(device || "")}${workflow ? `&workflow=${encodeURIComponent(workflow)}` : ""}`;
+  const src = `/comfyui/ui?instance=${encodeURIComponent(device || "")}`;
   const previewRect = getSnapRect(snapPreview);
 
   // Resize handle shared style
@@ -293,7 +311,9 @@ export function GraphPopover({ nodeType, device, workflow, onClose }: GraphPopov
 
         {/* ComfyUI iframe */}
         <iframe
+          ref={iframeRef}
           src={src}
+          onLoad={onIframeLoad}
           style={{
             flex: 1,
             border: "none",
