@@ -366,34 +366,17 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
         )}
       </div>
 
-      {/* ── Footer: model, device, run ── */}
+      {/* ── Control bar: run | device | model ── */}
       {isRunnable && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6, gap: 6, flexWrap: "wrap" }}>
-          {/* Model dropdown */}
-          {hasModelSelect && (
-            <ModelSelect
-              value={data.params?.model ?? modelParam!.default}
-              options={data.checkpoints && data.checkpoints.length > 0 ? data.checkpoints : modelParam!.options!}
-              onChange={(v) => { if (data.onParamChange) data.onParamChange(id, "model", v); }}
-            />
-          )}
-          {/* Device dropdown */}
-          {data.devices && data.devices.length > 0 && (
-            <DeviceSelect
-              value={data.params?._device ?? ""}
-              devices={data.devices}
-              onChange={(v) => { if (data.onParamChange) data.onParamChange(id, "_device", v || undefined); }}
-            />
-          )}
-          <div style={{ flex: 1 }} />
-          {/* Run button — right */}
+        <div style={{ display: "flex", alignItems: "center", marginTop: 6, gap: 4, flexWrap: "wrap" }}>
+          {/* Run / Running */}
           {data.isRunning ? (
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 5,
-                padding: "5px 12px",
+                padding: "5px 10px",
                 background: `${THEME.accent}18`,
                 border: `1px solid ${THEME.accent}40`,
                 borderRadius: 8,
@@ -402,6 +385,7 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
                 fontWeight: 600,
                 fontFamily: THEME.fontSans,
                 letterSpacing: "0.03em",
+                flexShrink: 0,
               }}
             >
               <Icons.Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
@@ -415,7 +399,7 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
                 display: "flex",
                 alignItems: "center",
                 gap: 5,
-                padding: "5px 12px",
+                padding: "5px 10px",
                 background: `${THEME.accent}18`,
                 border: `1px solid ${THEME.accent}40`,
                 borderRadius: 8,
@@ -426,6 +410,7 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
                 cursor: "pointer",
                 transition: "background 0.15s, border-color 0.15s",
                 letterSpacing: "0.03em",
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = `${THEME.accent}30`;
@@ -439,6 +424,24 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
               <Icons.Play size={11} fill="currentColor" />
               Run
             </button>
+          )}
+          {/* Device / worker */}
+          {data.devices && data.devices.length > 0 && (
+            <DeviceSelect
+              value={data.params?._device ?? ""}
+              devices={data.devices}
+              onChange={(v) => { if (data.onParamChange) data.onParamChange(id, "_device", v || undefined); }}
+            />
+          )}
+          {/* Model */}
+          {hasModelSelect && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <ModelSelect
+                value={data.params?.model ?? modelParam!.default}
+                options={data.checkpoints && data.checkpoints.length > 0 ? data.checkpoints : modelParam!.options!}
+                onChange={(v) => { if (data.onParamChange) data.onParamChange(id, "model", v); }}
+              />
+            </div>
           )}
         </div>
       )}

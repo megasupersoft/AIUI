@@ -61,9 +61,10 @@ export function ModelSelect({ value, options, onChange }: ModelSelectProps) {
           fontFamily: THEME.fontSans,
           fontSize: 11,
           color: THEME.textSecondary,
-          maxWidth: 200,
+          width: "100%",
           overflow: "hidden",
           whiteSpace: "nowrap",
+          boxSizing: "border-box",
         }}
       >
         {selBadge && <Badge arch={selBadge} />}
