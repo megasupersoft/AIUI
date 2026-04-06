@@ -27,6 +27,8 @@ services:
       - "3080:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    dns:
+      - 127.0.0.11
     networks:
       - aiui
 
