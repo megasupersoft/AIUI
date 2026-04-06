@@ -1,8 +1,10 @@
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi import APIRouter, Request
+from fastapi.responses import StreamingResponse, RedirectResponse, HTMLResponse, JSONResponse
 from urllib.parse import quote
+import json
 import httpx
 from .._device_registry import get_worker_urls
+from ..executors.comfyui_workflows import WORKFLOW_BUILDERS
 
 router = APIRouter()
 
@@ -18,6 +20,25 @@ async def open_comfyui_ui(instance: str = "", workflow: str = ""):
     if workflow:
         target += f"#{quote(workflow)}"
     return RedirectResponse(url=target)
+
+
+@router.post("/comfyui/graph")
+async def preview_comfyui_graph(request: Request):
+    """Compile a node's params into a ComfyUI prompt graph and return it as JSON."""
+    body = await request.json()
+    node_type = body.get("node_type", "")
+    params = body.get("params", {})
+    inputs = body.get("inputs", {})
+
+    builder = WORKFLOW_BUILDERS.get(node_type)
+    if builder is None:
+        return JSONResponse({"error": f"No ComfyUI workflow for: {node_type}"}, status_code=404)
+
+    try:
+        prompt = builder({**params, "_node_type": node_type}, inputs)
+        return JSONResponse({"prompt": prompt, "node_type": node_type})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @router.get("/comfyui/view")

@@ -25,6 +25,7 @@ import { getNode, SOCKET_COLORS, type SocketType } from "@aiui/nodes";
 import { Toolbar } from "../components/Toolbar";
 import { LogPanel, LogEntry } from "../components/LogPanel";
 import { ContextMenu } from "../components/ContextMenu";
+import { NodeContextMenu } from "../components/NodeContextMenu";
 import { ResizeHandle } from "../components/ResizeHandle";
 
 const nodeTypes = { aiuiNode: AIUINode };
@@ -83,6 +84,9 @@ function CanvasInner() {
   const [contextMenu, setContextMenu] = useState<{
     x: number; y: number;
     pendingConnection?: { nodeId: string; handleId: string; handleType: "source" | "target" };
+  } | null>(null);
+  const [nodeContextMenu, setNodeContextMenu] = useState<{
+    x: number; y: number; nodeId: string; nodeType: string; params: Record<string, any>;
   } | null>(null);
   const [isCutting, setIsCutting] = useState(false);
   const [cutLine, setCutLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
@@ -370,17 +374,34 @@ function CanvasInner() {
   const onNodeClick = useCallback((_: any, node: Node) => {
     setSelectedNodeId(node.id);
     setContextMenu(null);
+    setNodeContextMenu(null);
   }, []);
 
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
     setContextMenu(null);
+    setNodeContextMenu(null);
   }, []);
 
-  // Right-click context menu
+  // Right-click context menu (pane)
   const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
     event.preventDefault();
+    setNodeContextMenu(null);
     setContextMenu({ x: event.clientX, y: event.clientY });
+  }, []);
+
+  // Right-click context menu (node)
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    setContextMenu(null);
+    const d = node.data as any;
+    setNodeContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      nodeId: node.id,
+      nodeType: d.nodeType,
+      params: d.params || {},
+    });
   }, []);
 
   // Track connection drag source
@@ -499,6 +520,27 @@ function CanvasInner() {
     pendingConnectionRef.current = null;
     setContextMenu(null);
   }, [contextMenu, handleAddNode, nodes, setEdges]);
+
+  const handleDuplicateNode = useCallback((nodeId: string) => {
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const d = node.data as any;
+    const newId = `${Date.now()}`;
+    const newNode: Node = {
+      id: newId,
+      type: "aiuiNode",
+      position: { x: (node.position?.x ?? 0) + 40, y: (node.position?.y ?? 0) + 40 },
+      data: { ...d, nodeType: d.nodeType, params: { ...d.params } },
+    };
+    setNodes((nds) => [...nds, newNode]);
+    setSelectedNodeId(newId);
+  }, [nodes, setNodes]);
+
+  const handleDeleteNode = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+    if (selectedNodeId === nodeId) setSelectedNodeId(null);
+  }, [setNodes, setEdges, selectedNodeId]);
 
   const handleParamChange = useCallback(
     (nodeId: string, key: string, value: any) => {
@@ -814,6 +856,7 @@ function CanvasInner() {
               onNodeClick={onNodeClick}
               onPaneClick={onPaneClick}
               onPaneContextMenu={onPaneContextMenu}
+              onNodeContextMenu={onNodeContextMenu}
               nodeTypes={nodeTypes}
               fitView
               selectionOnDrag={!isCutting}
@@ -916,6 +959,20 @@ function CanvasInner() {
                   if (!socket) return undefined;
                   return { type: socket.type, direction: pc.handleType };
                 })() : undefined}
+              />
+            )}
+
+            {/* Node context menu */}
+            {nodeContextMenu && (
+              <NodeContextMenu
+                x={nodeContextMenu.x}
+                y={nodeContextMenu.y}
+                nodeId={nodeContextMenu.nodeId}
+                nodeType={nodeContextMenu.nodeType}
+                params={nodeContextMenu.params}
+                onClose={() => setNodeContextMenu(null)}
+                onDelete={handleDeleteNode}
+                onDuplicate={handleDuplicateNode}
               />
             )}
           </div>

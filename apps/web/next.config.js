@@ -2,6 +2,10 @@
 const nextConfig = {
   transpilePackages: ["@aiui/nodes", "@aiui/canvas"],
   output: 'standalone',
+  // Dev server — no caching
+  async headers() {
+    return [{ source: '/:path*', headers: [{ key: 'Cache-Control', value: 'no-store, must-revalidate' }] }];
+  },
   async rewrites() {
     // Only active in development — in production caddy handles routing
     if (process.env.NODE_ENV !== 'development') return [];

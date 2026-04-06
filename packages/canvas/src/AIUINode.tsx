@@ -117,6 +117,38 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
     }
   }, [data.onRunNode, id]);
 
+  const handleOpenGraph = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch("/comfyui/graph", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          node_type: data.nodeType,
+          params: data.params || {},
+          inputs: {},
+        }),
+      });
+      const json = await res.json();
+      const popup = window.open("", "_blank", "width=720,height=600,scrollbars=yes");
+      if (popup) {
+        popup.document.write(`<!DOCTYPE html><html><head><title>ComfyUI Graph — ${data.nodeType}</title>
+<style>body{margin:0;background:#1a1a2e;color:#e0e0e0;font-family:monospace;font-size:13px}
+pre{margin:0;padding:16px;white-space:pre-wrap;word-wrap:break-word}
+.toolbar{padding:8px 16px;background:#16213e;border-bottom:1px solid #333;display:flex;gap:8px;align-items:center}
+button{background:#2563eb;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+button:hover{background:#1d4ed8}
+h3{margin:0;font-size:14px;font-weight:600;color:#60a5fa}</style></head><body>
+<div class="toolbar"><h3>${data.nodeType}</h3>
+<button onclick="navigator.clipboard.writeText(document.getElementById('json').textContent)">Copy JSON</button></div>
+<pre id="json">${JSON.stringify(json.error || json.prompt, null, 2).replace(/</g, "&lt;")}</pre></body></html>`);
+        popup.document.close();
+      }
+    } catch (err) {
+      console.error("Failed to fetch graph:", err);
+    }
+  }, [data.nodeType, data.params]);
+
   const cardMinHeight = isPromptBuilder ? 300 : isTextInput ? 120 : (hasImageOutput || inputImageSrc) ? 100 : 56;
 
   return (
@@ -423,6 +455,37 @@ export const AIUINode = memo(({ id, data, selected }: { id: string; data: AIUINo
             >
               <Icons.Play size={11} fill="currentColor" />
               Run
+            </button>
+          )}
+          {/* Open in ComfyUI (dev) */}
+          {def.backends?.comfyui && (
+            <button
+              onClick={handleOpenGraph}
+              className="nodrag"
+              title="View ComfyUI graph"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "5px 6px",
+                background: "transparent",
+                border: `1px solid ${THEME.nodeBorder}`,
+                borderRadius: 8,
+                color: THEME.textMuted,
+                fontSize: 11,
+                cursor: "pointer",
+                transition: "color 0.15s, border-color 0.15s",
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = THEME.textPrimary;
+                e.currentTarget.style.borderColor = THEME.textSecondary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = THEME.textMuted;
+                e.currentTarget.style.borderColor = THEME.nodeBorder;
+              }}
+            >
+              <Icons.Braces size={12} />
             </button>
           )}
           {/* Device / worker */}
