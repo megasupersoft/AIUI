@@ -66,16 +66,15 @@ export function GraphPopover({ nodeType, device, workflow, onClose }: GraphPopov
   const onIframeLoad = useCallback(() => {
     if (!workflow || !iframeRef.current?.contentWindow) return;
     const send = () => {
+      console.log("[AIUI] Sending postMessage to ComfyUI iframe:", workflow);
       iframeRef.current?.contentWindow?.postMessage(
         { type: "aiui_load_workflow", workflow },
         "*"
       );
     };
-    // Send multiple times to handle ComfyUI's async init
-    send();
-    setTimeout(send, 1000);
-    setTimeout(send, 2000);
-    setTimeout(send, 4000);
+    // Retry many times — ComfyUI extensions load async and can take 5-10s
+    const delays = [500, 1500, 3000, 5000, 7000, 10000, 15000];
+    delays.forEach((ms) => setTimeout(send, ms));
   }, [workflow]);
 
   // Initial centered position

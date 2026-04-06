@@ -2,6 +2,9 @@
 const nextConfig = {
   transpilePackages: ["@aiui/nodes", "@aiui/canvas"],
   output: 'standalone',
+  env: {
+    NEXT_PUBLIC_BUILD_ID: new Date().toISOString().slice(0, 19).replace('T', ' '),
+  },
   // Dev server — no caching
   async headers() {
     return [{ source: '/:path*', headers: [{ key: 'Cache-Control', value: 'no-store, must-revalidate' }] }];

@@ -1018,6 +1018,23 @@ function CanvasInner() {
           </>
         )}
       </div>
+
+      {/* Version footer */}
+      <div style={{
+        padding: "2px 12px",
+        fontSize: 10,
+        fontFamily: THEME.fontMono,
+        color: THEME.textMuted,
+        background: THEME.panelBg,
+        borderTop: `1px solid ${THEME.panelBorder}`,
+        display: "flex",
+        justifyContent: "space-between",
+        flexShrink: 0,
+        userSelect: "text",
+      }}>
+        <span>AIUI v0.1.0-dev</span>
+        <span>build {process.env.NEXT_PUBLIC_BUILD_ID || new Date().toISOString().slice(0, 16)}</span>
+      </div>
     </div>
   );
 }
