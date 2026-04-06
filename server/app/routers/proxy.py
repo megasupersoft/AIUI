@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse, RedirectResponse, HTMLResponse,
 from urllib.parse import quote
 import json
 import httpx
-from .._device_registry import get_worker_urls
+from .._device_registry import get_worker_urls, get_worker_direct_url
 from ..executors.comfyui_workflows import WORKFLOW_BUILDERS
 
 router = APIRouter()
@@ -16,13 +16,16 @@ async def open_comfyui_ui(instance: str = "", workflow: str = ""):
     to ComfyUI with a hash fragment. This avoids the redirect-hash
     browser inconsistency.
     """
-    urls = get_worker_urls(instance if instance else None)
-    target = urls["http"].rstrip("/") + "/"
     if not workflow:
-        return RedirectResponse(url=target)
-    # Pass workflow as a query param — the AIUI extension reads it
-    safe_wf = quote(workflow)
-    return RedirectResponse(url=f"{target}?aiui_workflow={safe_wf}")
+        urls = get_worker_urls(instance if instance else None)
+        return RedirectResponse(url=urls["http"])
+    # Use direct worker URL (not proxy) so query params aren't stripped
+    direct = get_worker_direct_url(instance if instance else None)
+    if not direct:
+        urls = get_worker_urls(instance if instance else None)
+        direct = urls["http"]
+    target = direct.rstrip("/") + "/"
+    return RedirectResponse(url=f"{target}?aiui_workflow={quote(workflow)}")
 
 
 @router.post("/comfyui/graph")
