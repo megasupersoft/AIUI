@@ -10,6 +10,7 @@ services:
       - ./server/uploads:/app/uploads
     extra_hosts:
       - "skeletor:host-gateway"
+      - "comfyui.skeletor:host-gateway"
     networks:
       - aiui
 
