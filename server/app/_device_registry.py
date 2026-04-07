@@ -63,3 +63,13 @@ def get_worker_direct_url(device_id: Optional[str] = None) -> Optional[str]:
     if _worker_direct:
         return next(iter(_worker_direct.values()))
     return None
+
+def get_worker_direct_urls(device_id: Optional[str] = None) -> Dict[str, str]:
+    """Return HTTP and WS URLs using the direct worker IP (bypasses proxy)."""
+    direct = get_worker_direct_url(device_id)
+    if direct:
+        base = direct.rstrip("/")
+        ws_base = base.replace("http://", "ws://").replace("https://", "wss://")
+        return {"http": base + "/", "ws": ws_base + "/"}
+    # Fall back to proxy URLs if no direct URL available
+    return get_worker_urls(device_id)

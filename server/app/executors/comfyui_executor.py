@@ -5,7 +5,7 @@ import httpx
 import websockets
 from typing import Any
 from .base import BaseExecutor, ProgressCallback
-from .._device_registry import get_worker_urls
+from .._device_registry import get_worker_urls, get_worker_direct_urls
 from .comfyui_workflows import WORKFLOW_BUILDERS
 
 
@@ -26,7 +26,8 @@ class ComfyUIExecutor(BaseExecutor):
 
         # Pre-process: upload any image URLs to ComfyUI's input folder
         device_id = params.get("_device") or None
-        urls = get_worker_urls(device_id)
+        # Use direct worker IP for server-side API calls (proxy causes 307 redirects)
+        urls = get_worker_direct_urls(device_id)
         processed_inputs = await self._resolve_image_inputs(inputs, urls["http"], on_progress)
 
         prompt = builder({**params, "_node_type": node_type}, processed_inputs)
